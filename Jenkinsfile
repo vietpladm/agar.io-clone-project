@@ -19,5 +19,23 @@ pipeline {
         '''
       }
     }
+    stage('Deploy') {
+      steps {
+        script {
+          sh "echo 'Deploy to kubernetes'"
+          def filename = 'templates/deployment.yaml'
+          def data = readYaml file: filename
+          data.spec.template.spec.containers[0].image = "vietpl/agarioclone_agar:v2.${BUILD_NUMBER}"
+          sh "rm $filename"
+          writeYaml file: filename, data: data
+          sh "cat $filename"
+        }
+        withKubeConfig([credentialsId: 'kubeconfig', serverUrl: 'https://172.21.161.250:6443']) {
+          sh 'curl -LO "https://storage.googleapis.com/kubernetes-release/release/v1.20.5/bin/linux/amd64/kubectl"'  
+          sh 'chmod u+x ./kubectl'  
+          sh './kubectl apply -f templates'
+        }
+      }
+    }
   }
 }
