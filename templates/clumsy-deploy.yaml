@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agarioclone
+  labels:
+    app: agarioclone
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agarioclone
+  template:
+    metadata:
+      labels:
+        app: agarioclone
+    spec:
+      containers:
+        - name: agarioclone
+          image: vietpl/agarioclone_agar:v2.0
+          ports:
+            - containerPort: 8080
