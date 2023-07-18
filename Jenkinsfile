@@ -82,12 +82,12 @@ pipeline {
     }
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
-    stage('Deploy to release environment') {
+    stage('Tag image of production version') {
       when {
         beforeInput true
         branch 'release'
       }
-      // Yêu cầu nhập vào tag
+      // Yêu cầu nhập vào tag cho release image
       input {
         message "Enter release version... (example: v1.2.3)"
         ok "Confirm"
@@ -97,32 +97,45 @@ pipeline {
       }
       steps {
         sh '''
-          echo "Tag image to releae and push image"
+          echo "Tag image to release and push image"
           docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${IMAGE_TAG}
           echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
           docker push "vietpl/agarioclone_agar:${IMAGE_TAG}"
         '''
-        // Triển khai tới môi trường production
+        
+      }
+    }
+    stage('Update to the helm-chart of production') {
+
+       // Confirmation to update helm-chart of production?
+      input {
+        message "Approve to deploy to ArgoCD PRD?"
+        ok "Confirm"
+      }
+
+      steps {
+        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+          sh 'rm -rf argaio-helm'
+          sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+        }
         script {
-          sh "echo 'Deploy to kubernetes'"
-          echo "Update deployment.yaml"
-          def filename = 'templates/deployment.yaml'
+          sh "echo 'Update helm chart values'"
+          def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
-          data.spec.template.spec.containers[0].image = "vietpl/agarioclone_agar:${IMAGE_TAG}"
+          data.image.tag = "${IMAGE_TAG}"
           sh "rm $filename"
           writeYaml file: filename, data: data
           sh "cat $filename"
-          echo "Update service Node Port"
-          def servicefile = 'templates/service.yaml'
-          def servicedata = readYaml file: servicefile
-          servicedata.spec.ports[0].nodePort = 30290
-          sh "rm $servicefile"
-          writeYaml file: servicefile, data: servicedata
         }
-        withKubeConfig([credentialsId: 'kubeconfig', serverUrl: 'https://172.21.161.250:6443']) {
-          sh 'curl -LO "https://storage.googleapis.com/kubernetes-release/release/v1.20.5/bin/linux/amd64/kubectl"'
-          sh 'chmod u+x ./kubectl'
-          sh './kubectl apply -f templates -n release'
+        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+          sh '''
+            cd argaio-helm
+            git config user.email "jenkins@example.com"
+            git config user.name "Jenkins"
+            git add values.yaml
+            git commit -am "update image with new release tag as ${IMAGE_TAG}"
+            git push origin main
+          '''
         }
       }
     }
