@@ -53,7 +53,7 @@ pipeline {
     }
 
     // Deploy tới môi trường development, tương ứng là namespace dev trên Kubernetes
-    stage('Deploy to development environment') {
+    stage('Deploy to DEV environment') {
       when {
         branch 'develop'
       }
@@ -83,7 +83,8 @@ pipeline {
     }
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
-  stage('Tag image of production version') {
+ 
+ stage('Tag image of PRD version') {
       when {
         beforeInput true
         branch 'release'
@@ -101,13 +102,16 @@ pipeline {
         }
         sh '''
           echo "Tag image to release and push image"
-          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${IMAGE_TAG}
+          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${env.IMAGE_TAG}
           echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-          docker push "vietpl/agarioclone_agar:${IMAGE_TAG}"
+          docker push "vietpl/agarioclone_agar:${env.IMAGE_TAG}"
         '''
       }
     }
-    stage('Update to the helm-chart of production') {
+
+    // ...
+
+    stage('Update to the helm-chart of PRD') {
       when {
         beforeInput true
         branch 'release'
@@ -117,11 +121,11 @@ pipeline {
         ok "Confirm"
       }
       steps {
-        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-          sh 'rm -rf argaio-helm'
-          sh 'git clone https://github.com/vietpladm/argaio-helm.git'
-        }
         script {
+          withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+            sh 'rm -rf argaio-helm'
+            sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+          }
           sh "echo 'Update helm chart values'"
           def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
@@ -136,7 +140,7 @@ pipeline {
             git config user.email "phan1@chie.cf"
             git config user.name "vietpladm"
             git add values.yaml
-            git commit -am "update image with new release tag as ${IMAGE_TAG}"
+            git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
             git push origin main
           '''
         }
