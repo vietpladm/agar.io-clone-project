@@ -3,7 +3,7 @@ pipeline {
   environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-    env.IMAGE_TAG = params.IMAGE_TAG
+     IMAGE_TAG = "${params.IMAGE_TAG}"
       }
 
 
@@ -124,7 +124,7 @@ pipeline {
           sh "echo 'Update helm chart values'"
           def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
-          data.image.tag = env.IMAGE_TAG
+          data.image.tag = IMAGE_TAG
           sh "rm $filename"
           writeYaml file: filename, data: data
           sh "cat $filename"
@@ -135,7 +135,7 @@ pipeline {
             git config user.email "phan1@chie.cf"
             git config user.name "vietpladm"
             git add values.yaml
-            git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
+            git commit -am "update image with new release tag as ${IMAGE_TAG}"
             git push origin main
           """
         }
