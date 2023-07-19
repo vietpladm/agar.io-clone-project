@@ -1,10 +1,8 @@
-def imageTag = ''
 pipeline {
   agent any
     environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-    IMAGETAG = ""
   }
 
 
@@ -85,58 +83,51 @@ pipeline {
       }
     }
 
-    // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
+    // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và update Helm-chart repo chuẩn bị cho ArgoCD step.
  
-    stage('Tag image of production version') {
-      when {
-        beforeInput true
-        branch 'release'
-      }
-      steps {
-        script {
-          def userInput = input(
-            message: "Enter release version... (example: v1.2.3)",
-            parameters: [string(name: "IMAGE_TAG", defaultValue: "v0.0.0")]
-          )
-          imageTag = userInput.IMAGE_TAG
-        }
-        steps {
-          sh '''
-            echo "Tag image to release and push image"
-            docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${imageTag}
-            echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-            docker push "vietpl/agarioclone_agar:${imageTag}"
-          '''
-        }
-      }
-    }
-    
-    stage('Update to the helm-chart of production') {
-      when {
-        beforeInput true
-        branch 'release'
-      }
-      steps {
-        script {
-          sh "echo 'Update helm chart values'"
-          def filename = 'argaio-helm/values.yaml'
-          def data = readYaml file: filename
-          data.image.tag = imageTag
-          sh "rm $filename"
-          writeYaml file: filename, data: data
-          sh "cat $filename"
-        }
-        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-          sh '''
-            cd argaio-helm
-            git config user.email "phan1@chie.cf"
-            git config user.name "vietpladm"
-            git add values.yaml
-            git commit -am "update image with new release tag as ${imageTag}"
-            git push origin main
-          '''
-        }
-      }
+stage('Tag image and update Helm-Chart for PRD') {
+  when {
+    beforeInput true
+    branch 'release'
+  }
+  input {
+    message "Enter release version ... (example: v1.2.3) to release to production environment"
+    ok "Confirm"
+    parameters {
+      string(name: "IMAGE_TAG", defaultValue: "v0.0.0")
     }
   }
+  steps {
+    sh '''
+      echo "Tag image to release and push image to docker hub"
+      docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${env.IMAGE_TAG}
+      echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
+      docker push "vietpl/agarioclone_agar:${IMAGE_TAG}"
+    '''
+    script {
+      withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+        sh 'rm -rf argaio-helm'
+        sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+      }
+      sh "echo 'Update helm chart values'"
+      def filename = 'argaio-helm/values.yaml'
+      def data = readYaml file: filename
+      data.image.tag = IMAGE_TAG
+      sh "rm $filename"
+      writeYaml file: filename, data: data
+      sh "cat $filename"
+    }
+    withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+      sh '''
+        cd argaio-helm
+        git config user.email "phan1@chie.cf"
+        git config user.name "vietpladm"
+        git add values.yaml
+        git commit -am "update image with new release tag as ${IMAGE_TAG}"
+        git push origin main
+      '''
+    }
+  }
+ }
+}
 }
