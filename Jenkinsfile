@@ -132,14 +132,14 @@ pipeline {
           sh "cat $filename"
         }
         withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-          sh '''
+          sh """
             cd argaio-helm
-            git config user.email "jenkins@example.com"
-            git config user.name "Jenkins"
-            git add .
+            git config user.email "phan1@chie.cf"
+            git config user.name "vietpladm"
+            git add values.yaml
             git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
             git push origin main
-          '''
+          """
         }
       }
     }
