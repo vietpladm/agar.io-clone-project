@@ -1,9 +1,10 @@
+def imageTag = ''
 pipeline {
   agent any
     environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-    IMAGE_TAG = ""
+    IMAGETAG = ""
   }
 
 
@@ -53,6 +54,8 @@ pipeline {
     }
 
     // Deploy tới môi trường development, tương ứng là namespace dev trên Kubernetes
+
+    
     stage('Deploy to DEV environment') {
       when {
         branch 'develop'
@@ -84,52 +87,42 @@ pipeline {
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
  
- stage('Tag image of PRD version') {
+   stages {
+    stage('Tag image of production version') {
       when {
         beforeInput true
         branch 'release'
       }
-      input {
-        message "Enter release version... (example: v1.2.3)"
-        ok "Confirm"
-        parameters {
-          string(name: "IMAGE_TAG", defaultValue: "v0.0.0")
-        }
-      }
       steps {
         script {
-          env.IMAGE_TAG = params.IMAGE_TAG
+          def userInput = input(
+            message: "Enter release version... (example: v1.2.3)",
+            parameters: [string(name: "IMAGE_TAG", defaultValue: "v0.0.0")]
+          )
+          imageTag = userInput.IMAGE_TAG
         }
-        sh '''
-          echo "Tag image to release and push image"
-          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${env.IMAGE_TAG}
-          echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-          docker push "vietpl/agarioclone_agar:${env.IMAGE_TAG}"
-        '''
+        steps {
+          sh '''
+            echo "Tag image to release and push image"
+            docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${imageTag}
+            echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
+            docker push "vietpl/agarioclone_agar:${imageTag}"
+          '''
+        }
       }
     }
-
-    // ...
-
-    stage('Update to the helm-chart of PRD') {
+    
+    stage('Update to the helm-chart of production') {
       when {
         beforeInput true
         branch 'release'
       }
-      input {
-        message "Approve to deploy to ArgoCD PRD?"
-        ok "Confirm"
-      }
       steps {
         script {
-          withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-            sh 'rm -rf argaio-helm'
-            sh 'git clone https://github.com/vietpladm/argaio-helm.git'
-          }
           sh "echo 'Update helm chart values'"
           def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
-          data.image.tag = env.IMAGE_TAG
+          data.image.tag = imageTag
           sh "rm $filename"
           writeYaml file: filename, data: data
           sh "cat $filename"
@@ -140,11 +133,12 @@ pipeline {
             git config user.email "phan1@chie.cf"
             git config user.name "vietpladm"
             git add values.yaml
-            git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
+            git commit -am "update image with new release tag as ${imageTag}"
             git push origin main
           '''
         }
       }
     }
   }
+}
 }
