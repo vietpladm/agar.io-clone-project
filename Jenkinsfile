@@ -136,7 +136,7 @@ pipeline {
             cd argaio-helm
             git config user.email "jenkins@example.com"
             git config user.name "Jenkins"
-            git add values.yaml
+            git add .
             git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
             git push origin main
           '''
