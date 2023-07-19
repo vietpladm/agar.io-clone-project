@@ -149,3 +149,4 @@ stage('Tag image of production version') {
     }
   }
 }
+}
