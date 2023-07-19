@@ -87,7 +87,6 @@ pipeline {
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
  
-   stages {
     stage('Tag image of production version') {
       when {
         beforeInput true
@@ -140,5 +139,4 @@ pipeline {
       }
     }
   }
-}
 }
