@@ -3,6 +3,7 @@ pipeline {
   environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
+    env.IMAGE_TAG = params.IMAGE_TAG
       }
 
 
@@ -96,10 +97,7 @@ pipeline {
         }
       }
       steps {
-	    script {
-		env.IMAGE_TAG = "${params.IMAGE_TAG}"
-		}
-        sh '''
+	      sh '''
           echo "Tag image to release and push image"
           docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${IMAGE_TAG}
           echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
@@ -108,43 +106,40 @@ pipeline {
       }
     }
     stage('Update to the helm-chart of production') {
-  when {
-    beforeInput true
-    branch 'release'
-  }
-  // Confirmation to update helm-chart of production?
-  input {
-    message "Approve to deploy to ArgoCD PRD?"
-    ok "Confirm"
-  }
-  steps {
-    script {
-      def imageTag = env.IMAGE_TAG
-      withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-        sh 'rm -rf argaio-helm'
-        sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+        when {
+        beforeInput true
+        branch 'release'
       }
-      script {
-        sh "echo 'Update helm chart values'"
-        def filename = 'argaio-helm/values.yaml'
-        def data = readYaml file: filename
-        data.image.tag = imageTag
-        sh "rm $filename"
-        writeYaml file: filename, data: data
-        sh "cat $filename"
+       // Confirmation to update helm-chart of production?
+      input {
+        message "Approve to deploy to ArgoCD PRD?"
+        ok "Confirm"
       }
-      withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-        sh """
-          cd argaio-helm
-          git config user.email "phan1@chie.cf"
-          git config user.name "vietpladm"
-          git add values.yaml
-          git commit -am "update image with new release tag as ${imageTag}"
-          git push origin main
-        """
+      steps {
+        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+          sh 'rm -rf argaio-helm'
+          sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+        }
+        script {
+          sh "echo 'Update helm chart values'"
+          def filename = 'argaio-helm/values.yaml'
+          def data = readYaml file: filename
+          data.image.tag = env.IMAGE_TAG
+          sh "rm $filename"
+          writeYaml file: filename, data: data
+          sh "cat $filename"
+        }
+        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+          sh """
+            cd argaio-helm
+            git config user.email "phan1@chie.cf"
+            git config user.name "vietpladm"
+            git add values.yaml
+            git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
+            git push origin main
+          """
+        }
       }
     }
   }
- }
- }
 }
