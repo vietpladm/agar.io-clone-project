@@ -100,7 +100,7 @@ stage('Tag image and update Helm-Chart for PRD') {
   steps {
     sh '''
       echo "Tag image to release and push image to docker hub"
-      docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${env.IMAGE_TAG}
+      docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${IMAGE_TAG}
       echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
       docker push "vietpl/agarioclone_agar:${IMAGE_TAG}"
     '''
