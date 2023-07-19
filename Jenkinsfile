@@ -108,6 +108,10 @@ pipeline {
       }
     }
     stage('Update to the helm-chart of production') {
+        when {
+        beforeInput true
+        branch 'release'
+      }
        // Confirmation to update helm-chart of production?
       input {
         message "Approve to deploy to ArgoCD PRD?"
