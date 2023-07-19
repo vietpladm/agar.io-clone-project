@@ -1,15 +1,10 @@
 pipeline {
   agent any
-
-  parameters {
-    string(name: "IMAGE_TAG", defaultValue: "v0.0.0")
-  }
-
   environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-    IMAGE_TAG = "${params.IMAGE_TAG}"
-  }
+     IMAGE_TAG = "${params.IMAGE_TAG}"
+      }
 
 
   // Stage ví dụ để nhánh bugfix và feature sẽ thực thi quá trình test ở CI.
@@ -93,20 +88,23 @@ stage('Tag image of production version') {
         beforeInput true
         branch 'release'
       }
-      input {
-        message "Enter release version... (example: v1.2.3)"
-        ok "Confirm"
-        parameters {
-          string(name: "IMAGE_TAG", defaultValue: "v0.0.0")
-        }
-      }
       steps {
-        sh '''
-          echo "Tag image to release and push image"
-          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${params.IMAGE_TAG}
-          echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-          docker push "vietpl/agarioclone_agar:${params.IMAGE_TAG}"
-        '''
+        script {
+          def releaseTagInput = input(
+            id: 'releaseTagInput',
+            message: 'Enter release version... (example: v1.2.3)',
+            parameters: [string(name: 'IMAGE_TAG', defaultValue: 'v0.0.0')]
+          )
+          env.IMAGE_TAG = releaseTagInput.IMAGE_TAG
+        }
+        steps {
+          sh '''
+            echo "Tag image to release and push image"
+            docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${env.IMAGE_TAG}
+            echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
+            docker push "vietpl/agarioclone_agar:${env.IMAGE_TAG}"
+          '''
+        }
       }
     }
 
@@ -115,38 +113,40 @@ stage('Tag image of production version') {
         beforeInput true
         branch 'release'
       }
-      input {
-        message "Approve to deploy to ArgoCD PRD?"
-        ok "Confirm"
-        parameters {
-          string(name: "IMAGE_TAG", defaultValue: "${params.IMAGE_TAG}")
-        }
-      }
       steps {
-        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-          sh 'rm -rf argaio-helm'
-          sh 'git clone https://github.com/vietpladm/argaio-helm.git'
-        }
         script {
-          sh "echo 'Update helm chart values'"
-          def filename = 'argaio-helm/values.yaml'
-          def data = readYaml file: filename
-          data.image.tag = params.IMAGE_TAG
-          sh "rm $filename"
-          writeYaml file: filename, data: data
-          sh "cat $filename"
+          def approvalInput = input(
+            id: 'approvalInput',
+            message: 'Approve to deploy to ArgoCD PRD?',
+            parameters: []
+          )
         }
-        withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
-          sh """
-            cd argaio-helm
-            git config user.email "phan1@chie.cf"
-            git config user.name "vietpladm"
-            git add values.yaml
-            git commit -am "update image with new release tag as ${params.IMAGE_TAG}"
-            git push origin main
-          """
-        }
+        steps {
+          withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+            sh 'rm -rf argaio-helm'
+            sh 'git clone https://github.com/vietpladm/argaio-helm.git'
+          }
+          script {
+            sh "echo 'Update helm chart values'"
+            def filename = 'argaio-helm/values.yaml'
+            def data = readYaml file: filename
+            data.image.tag = env.IMAGE_TAG
+            sh "rm $filename"
+            writeYaml file: filename, data: data
+            sh "cat $filename"
+          }
+          withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+            sh """
+              cd argaio-helm
+              git config user.email "phan1@chie.cf"
+              git config user.name "vietpladm"
+              git add values.yaml
+              git commit -am "update image with new release tag as ${env.IMAGE_TAG}"
+              git push origin main
+            """
+                    }
       }
     }
   }
+}
 }
