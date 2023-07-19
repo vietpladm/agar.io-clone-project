@@ -1,10 +1,15 @@
 pipeline {
   agent any
+
+  parameters {
+    string(name: "IMAGE_TAG", defaultValue: "v0.0.0")
+  }
+
   environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-     IMAGE_TAG = "${params.IMAGE_TAG}"
-      }
+    IMAGE_TAG = "${params.IMAGE_TAG}"
+  }
 
 
   // Stage ví dụ để nhánh bugfix và feature sẽ thực thi quá trình test ở CI.
@@ -83,12 +88,11 @@ pipeline {
     }
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và triển khai.
-    stage('Tag image of production version') {
+stage('Tag image of production version') {
       when {
         beforeInput true
         branch 'release'
       }
-      // Yêu cầu nhập vào tag cho release image
       input {
         message "Enter release version... (example: v1.2.3)"
         ok "Confirm"
@@ -97,23 +101,26 @@ pipeline {
         }
       }
       steps {
-	      sh '''
+        sh '''
           echo "Tag image to release and push image"
-          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${IMAGE_TAG}
+          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${params.IMAGE_TAG}
           echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-          docker push "vietpl/agarioclone_agar:${IMAGE_TAG}"
+          docker push "vietpl/agarioclone_agar:${params.IMAGE_TAG}"
         '''
       }
     }
+
     stage('Update to the helm-chart of production') {
-        when {
+      when {
         beforeInput true
         branch 'release'
       }
-       // Confirmation to update helm-chart of production?
       input {
         message "Approve to deploy to ArgoCD PRD?"
         ok "Confirm"
+        parameters {
+          string(name: "IMAGE_TAG", defaultValue: "${params.IMAGE_TAG}")
+        }
       }
       steps {
         withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
@@ -124,7 +131,7 @@ pipeline {
           sh "echo 'Update helm chart values'"
           def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
-          data.image.tag = IMAGE_TAG
+          data.image.tag = params.IMAGE_TAG
           sh "rm $filename"
           writeYaml file: filename, data: data
           sh "cat $filename"
@@ -135,7 +142,7 @@ pipeline {
             git config user.email "phan1@chie.cf"
             git config user.name "vietpladm"
             git add values.yaml
-            git commit -am "update image with new release tag as ${IMAGE_TAG}"
+            git commit -am "update image with new release tag as ${params.IMAGE_TAG}"
             git push origin main
           """
         }
