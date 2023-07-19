@@ -3,7 +3,7 @@ pipeline {
   environment {
     DOCKER_REGISTRY_USERNAME = credentials('DOCKER_REGISTRY_USERNAME')
     DOCKER_REGISTRY_PASSWORD = credentials('DOCKER_REGISTRY_PASSWORD')
-    env.IMAGE_TAG = "${params.IMAGE_TAG}"
+    env.IMAGE_TAG = params.IMAGE_TAG
       }
 
 
