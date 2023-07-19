@@ -126,7 +126,7 @@ pipeline {
           sh "echo 'Update helm chart values'"
           def filename = 'argaio-helm/values.yaml'
           def data = readYaml file: filename
-          data.image.tag = env.IMAGE_TAG
+          data.image.tag = ${env.IMAGE_TAG}
           sh "rm $filename"
           writeYaml file: filename, data: data
           sh "cat $filename"
