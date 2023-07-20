@@ -36,52 +36,47 @@ pipeline {
     }
 
    // Với pipeline của nhánh develop, push docker image lên Docker Hub
-    stage('Push Docker Image in develop') {
-      when {
-        branch 'develop'
-      }
-      // Đánh tag dev cho image
-      steps {
-        sh '''
-          echo "Tag image to dev and push image"
-          docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:v2.${BUILD_NUMBER}-dev
-          echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
-          docker push "vietpl/agarioclone_agar:v2.${BUILD_NUMBER}-dev"
-        '''
-      }
-    }
+   
+    stage('Create & Tag image & Update Helm-Chart for DEV Environment') {
+  when {
+    branch 'release'
+  }
+  steps {
+    // Tag image and push to Docker Hub
+    sh '''
+      echo "Tag image to release and push image to Docker Hub"
+      docker tag vietpl/agarioclone_agar:v2.${BUILD_NUMBER} vietpl/agarioclone_agar:${BUILD_NUMBER}-dev
+      echo ${DOCKER_REGISTRY_PASSWORD} | docker login -u ${DOCKER_REGISTRY_USERNAME} --password-stdin
+      docker push "vietpl/agarioclone_agar:${BUILD_NUMBER}-dev"
+    '''
 
-    // Deploy tới môi trường development, tương ứng là namespace dev trên Kubernetes
-
-    
-    stage('Deploy to DEV environment') {
-      when {
-        branch 'develop'
+    // Update Helm-Chart values for DEV Environment
+    script {
+      withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+        sh 'rm -rf argaio-helm-dev'
+        sh 'git clone https://github.com/vietpladm/argaio-helm-dev.git'
       }
-      steps {
-        script {
-          sh "echo 'Deploy to kubernetes'"
-          echo "Update tag in deployment"
-          def filename = 'templates/deployment.yaml'
-          def data = readYaml file: filename
-          data.spec.template.spec.containers[0].image = "vietpl/agarioclone_agar:v2.${BUILD_NUMBER}-dev"
-          sh "rm $filename"
-          writeYaml file: filename, data: data
-          sh "cat $filename"
-          echo "Update service Node Port"
-          def servicefile = 'templates/service.yaml'
-          def servicedata = readYaml file: servicefile
-          servicedata.spec.ports[0].nodePort = 30190
-          sh "rm $servicefile"
-          writeYaml file: servicefile, data: servicedata
-        }
-        withKubeConfig([credentialsId: 'kubeconfig', serverUrl: 'https://172.21.161.250:6443']) {
-          sh 'curl -LO "https://storage.googleapis.com/kubernetes-release/release/v1.20.5/bin/linux/amd64/kubectl"'
-          sh 'chmod u+x ./kubectl'
-          sh './kubectl apply -f templates -n dev'
-        }
-      }
+      sh "echo 'Update Helm chart values'"
+      def filename = 'argaio-helm-dev/values.yaml'
+      def data = readYaml file: filename
+      data.image.tag = "${BUILD_NUMBER}-dev"
+      sh "rm $filename"
+      writeYaml file: filename, data: data
+      sh "cat $filename"
     }
+    withCredentials([gitUsernamePassword(credentialsId: 'jenkins_github_pac', gitToolName: 'Default')]) {
+      sh '''
+        cd argaio-helm-dev
+        git config user.email "phan1@chie.cf"
+        git config user.name "vietpladm"
+        git add values.yaml
+        git commit -am "Update image with new dev tag as ${BUILD_NUMBER}-dev"
+        git push origin main
+      '''
+    }
+  }
+}
+
 
     // Nếu là nhánh release, yêu cầu nhập vào version cho ứng dụng để đánh tag và update Helm-chart repo chuẩn bị cho ArgoCD step.
  
