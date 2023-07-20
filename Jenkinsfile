@@ -36,10 +36,10 @@ pipeline {
     }
 
    // Với pipeline của nhánh develop, push docker image lên Docker Hub
-   
+
     stage('Create & Tag image & Update Helm-Chart for DEV Environment') {
   when {
-    branch 'release'
+    branch 'develop'
   }
   steps {
     // Tag image and push to Docker Hub
