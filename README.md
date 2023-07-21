@@ -1,13 +1,6 @@
 Agar.io Clone
 =============
 
-This project was originally created by @huytd. I have since taken ownership of the repository to revive the project.
-
-[![GitHub Stars](https://img.shields.io/github/stars/huytd/agar.io-clone.svg)](https://github.com/huytd/agar.io-clone/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/huytd/agar.io-clone.svg)](https://github.com/huytd/agar.io-clone/issues)
-[![GitHub Wiki](https://img.shields.io/badge/project-wiki-ff69b4.svg)](https://github.com/huytd/agar.io-clone/wiki/Home)
-[![Live Demo](https://img.shields.io/badge/demo-online-green.svg)](#live-demos)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/huytd/agar.io-clone?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 A simple but powerful Agar.IO clone built with socket.IO and HTML5 canvas on top of NodeJS.
 
@@ -17,8 +10,6 @@ A simple but powerful Agar.IO clone built with socket.IO and HTML5 canvas on top
 An updated live list of demos can be found on the [Live Demos wiki page](https://github.com/owenashurst/agar.io-clone/wiki/Live-Demos).
 
 The official Agar.IO-Clone URL can be found [here](https://owenashurst-agario-clone.herokuapp.com).
-
-This is the most up to date version from master. Any merged pull requests will deploy to this URL automatically.
 
 ---
 
